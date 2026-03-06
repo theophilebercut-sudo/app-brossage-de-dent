@@ -1,9 +1,9 @@
-const CACHE = 'brossage-v2';
+const CACHE = 'brossage-v3';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icon.svg',
+  './icon.png',
   './supabase.min.js'
 ];
 
