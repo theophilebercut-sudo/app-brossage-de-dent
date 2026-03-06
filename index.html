@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suivi Brossage des Dents</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4ff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1.2rem;
+      color: #1a1a2e;
+    }
+
+    h1 {
+      font-size: 1.7rem;
+      margin-bottom: 0.4rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 2.5rem;
+      text-align: center;
+      font-size: 1rem;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 1.6rem 0.5rem;
+      font-size: 1.8rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 18px;
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    }
+
+    .btn:active { transform: scale(0.93); box-shadow: none; }
+
+    .btn-0 { background: #ff6b6b; color: white; }
+    .btn-1 { background: #ffd93d; color: #333; }
+    .btn-2 { background: #6bcb77; color: white; }
+
+    .btn .label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-top: 0.3rem;
+      opacity: 0.85;
+    }
+
+    .message {
+      width: 100%;
+      max-width: 380px;
+      background: white;
+      border-radius: 12px;
+      padding: 0.9rem 1.2rem;
+      margin-bottom: 2rem;
+      text-align: center;
+      font-weight: 500;
+      display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .message.success { border-left: 4px solid #6bcb77; }
+    .message.error   { border-left: 4px solid #ff6b6b; }
+
+    .history {
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .history h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .entry {
+      background: white;
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.6rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .entry-date {
+      color: #777;
+      font-size: 0.85rem;
+    }
+
+    .badge {
+      border-radius: 20px;
+      padding: 0.3rem 0.85rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+
+    .badge-0 { background: #ffe0e0; color: #c0392b; }
+    .badge-1 { background: #fff3cd; color: #856404; }
+    .badge-2 { background: #d4edda; color: #155724; }
+
+    .hint {
+      color: #aaa;
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🦷 Brossage des Dents</h1>
+  <p class="subtitle">Combien de fois aujourd'hui ?</p>
+
+  <div class="buttons">
+    <button class="btn btn-0" onclick="logBrossage(0)">
+      0
+      <span class="label">aucun</span>
+    </button>
+    <button class="btn btn-1" onclick="logBrossage(1)">
+      1×
+      <span class="label">une fois</span>
+    </button>
+    <button class="btn btn-2" onclick="logBrossage(2)">
+      2×
+      <span class="label">deux fois</span>
+    </button>
+  </div>
+
+  <div id="message" class="message"></div>
+
+  <div class="history">
+    <h2>Historique récent</h2>
+    <div id="entries"><p class="hint">Chargement…</p></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://wpeqhdbehwfhmihaerla.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_bG5qZzPvDE9B1FQYyG4Elg_NcUmfCYq';
+
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function logBrossage(n) {
+      const msg = document.getElementById('message');
+      msg.style.display = 'none';
+      msg.className = 'message';
+
+      const { error } = await db
+        .from('suivi_brossage')
+        .insert({ brossages: n });
+
+      if (error) {
+        msg.textContent = '❌ Erreur : ' + error.message;
+        msg.className = 'message error';
+      } else {
+        const labels = [
+          '😬 Aucun brossage enregistré.',
+          '👍 1 brossage enregistré !',
+          '🌟 2 brossages enregistrés !'
+        ];
+        msg.textContent = '✅ ' + labels[n];
+        msg.className = 'message success';
+        loadHistory();
+      }
+
+      msg.style.display = 'block';
+    }
+
+    async function loadHistory() {
+      const container = document.getElementById('entries');
+
+      const { data, error } = await db
+        .from('suivi_brossage')
+        .select('*')
+        .order('date_reponse', { ascending: false })
+        .limit(30);
+
+      if (error) {
+        container.innerHTML = '<p class="hint">Impossible de charger l\'historique.</p>';
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '<p class="hint">Aucune entrée pour l\'instant.</p>';
+        return;
+      }
+
+      container.innerHTML = data.map(row => {
+        const d = new Date(row.date_reponse);
+        const dateStr = d.toLocaleDateString('fr-FR', {
+          weekday: 'short', day: 'numeric', month: 'short'
+        }) + ' · ' + d.toLocaleTimeString('fr-FR', {
+          hour: '2-digit', minute: '2-digit'
+        });
+        return `
+          <div class="entry">
+            <span class="entry-date">${dateStr}</span>
+            <span class="badge badge-${row.brossages}">${row.brossages} ×</span>
+          </div>`;
+      }).join('');
+    }
+
+    loadHistory();
+  </script>
+</body>
+</html>
