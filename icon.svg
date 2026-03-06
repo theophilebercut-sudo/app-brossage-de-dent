@@ -1,4 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
   <rect width="512" height="512" rx="110" fill="#6bcb77"/>
-  <text x="256" y="370" font-size="300" text-anchor="middle">🦷</text>
+  <!-- Tooth crown -->
+  <rect x="136" y="128" width="240" height="192" rx="68" fill="white"/>
+  <!-- Left root -->
+  <rect x="148" y="292" width="92" height="116" rx="30" fill="white"/>
+  <!-- Right root -->
+  <rect x="272" y="292" width="92" height="116" rx="30" fill="white"/>
+  <!-- Shine -->
+  <rect x="172" y="156" width="38" height="80" rx="19" fill="#c8f0d0" opacity="0.8"/>
 </svg>

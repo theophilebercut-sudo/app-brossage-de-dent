@@ -1,10 +1,10 @@
-const CACHE = 'brossage-v1';
+const CACHE = 'brossage-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon.svg',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js'
+  './supabase.min.js'
 ];
 
 // Pre-cache all app files on install
