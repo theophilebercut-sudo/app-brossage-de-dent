@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Suivi Brossage des Dents</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#6bcb77" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Brossage" />
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -128,9 +137,45 @@
       text-align: center;
       padding: 1rem;
     }
+
+    .offline-banner {
+      width: 100%;
+      max-width: 380px;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 10px;
+      padding: 0.7rem 1rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #856404;
+      display: none;
+    }
+
+    .pending-notice {
+      background: #e8f4fd;
+      border-radius: 8px;
+      padding: 0.5rem 0.8rem;
+      font-size: 0.82rem;
+      color: #0066cc;
+      margin-bottom: 0.8rem;
+      text-align: center;
+      display: none;
+    }
+
+    .message.offline {
+      border-left: 4px solid #ffc107;
+    }
+
+    .entry.pending {
+      opacity: 0.75;
+      border-left: 3px solid #ffc107;
+    }
   </style>
 </head>
 <body>
+
+  <div id="offline-banner" class="offline-banner">📡 Hors ligne — vos entrées seront synchronisées à la reconnexion.</div>
 
   <h1>🦷 Brossage des Dents</h1>
   <p class="subtitle">Combien de fois aujourd'hui ?</p>
@@ -154,6 +199,7 @@
 
   <div class="history">
     <h2>Historique récent</h2>
+    <div id="pending-notice" class="pending-notice"></div>
     <div id="entries"><p class="hint">Chargement…</p></div>
   </div>
 
@@ -161,27 +207,102 @@
   <script>
     const SUPABASE_URL = 'https://wpeqhdbehwfhmihaerla.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_bG5qZzPvDE9B1FQYyG4Elg_NcUmfCYq';
+    const QUEUE_KEY = 'brossage_pending';
 
     const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // ── Offline queue (localStorage) ──────────────────────────────────────────
+
+    function getQueue() {
+      try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); }
+      catch { return []; }
+    }
+
+    function saveQueue(q) {
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    }
+
+    function enqueue(brossages) {
+      const q = getQueue();
+      q.push({ brossages, date_reponse: new Date().toISOString() });
+      saveQueue(q);
+      updatePendingNotice();
+    }
+
+    function updatePendingNotice() {
+      const q = getQueue();
+      const el = document.getElementById('pending-notice');
+      if (q.length > 0) {
+        el.textContent = `⏳ ${q.length} entrée${q.length > 1 ? 's' : ''} en attente de synchronisation`;
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    }
+
+    async function syncPending() {
+      const q = getQueue();
+      if (q.length === 0) return;
+      const synced = [];
+      for (const entry of q) {
+        const { error } = await db.from('suivi_brossage').insert(entry);
+        if (error) break; // stop on first failure (network might be flaky)
+        synced.push(entry);
+      }
+      if (synced.length > 0) {
+        saveQueue(q.filter(e => !synced.includes(e)));
+        updatePendingNotice();
+        loadHistory();
+      }
+    }
+
+    // ── Online / offline ──────────────────────────────────────────────────────
+
+    function updateOfflineBanner() {
+      document.getElementById('offline-banner').style.display =
+        navigator.onLine ? 'none' : 'block';
+    }
+
+    window.addEventListener('online',  () => { updateOfflineBanner(); syncPending(); });
+    window.addEventListener('offline', () => { updateOfflineBanner(); });
+
+    // ── Log a brushing ────────────────────────────────────────────────────────
 
     async function logBrossage(n) {
       const msg = document.getElementById('message');
       msg.style.display = 'none';
       msg.className = 'message';
 
+      const labels = [
+        '😬 Aucun brossage enregistré.',
+        '👍 1 brossage enregistré !',
+        '🌟 2 brossages enregistrés !'
+      ];
+      const offlineLabels = [
+        '😬 Sauvegardé localement — synchronisation en attente.',
+        '👍 Sauvegardé localement — synchronisation en attente.',
+        '🌟 Sauvegardé localement — synchronisation en attente.'
+      ];
+
+      if (!navigator.onLine) {
+        enqueue(n);
+        msg.textContent = '📥 ' + offlineLabels[n];
+        msg.className = 'message offline';
+        msg.style.display = 'block';
+        loadHistory();
+        return;
+      }
+
       const { error } = await db
         .from('suivi_brossage')
         .insert({ brossages: n });
 
       if (error) {
-        msg.textContent = '❌ Erreur : ' + error.message;
-        msg.className = 'message error';
+        // Treat any network error as offline
+        enqueue(n);
+        msg.textContent = '📥 ' + offlineLabels[n];
+        msg.className = 'message offline';
       } else {
-        const labels = [
-          '😬 Aucun brossage enregistré.',
-          '👍 1 brossage enregistré !',
-          '🌟 2 brossages enregistrés !'
-        ];
         msg.textContent = '✅ ' + labels[n];
         msg.className = 'message success';
         loadHistory();
@@ -190,8 +311,35 @@
       msg.style.display = 'block';
     }
 
+    // ── History ───────────────────────────────────────────────────────────────
+
+    function entryHtml(row, pending = false) {
+      const d = new Date(row.date_reponse);
+      const dateStr = d.toLocaleDateString('fr-FR', {
+        weekday: 'short', day: 'numeric', month: 'short'
+      }) + ' · ' + d.toLocaleTimeString('fr-FR', {
+        hour: '2-digit', minute: '2-digit'
+      });
+      const cls = pending ? 'entry pending' : 'entry';
+      const suffix = pending ? ' ⏳' : '';
+      return `<div class="${cls}">
+        <span class="entry-date">${dateStr}${suffix}</span>
+        <span class="badge badge-${row.brossages}">${row.brossages} ×</span>
+      </div>`;
+    }
+
     async function loadHistory() {
       const container = document.getElementById('entries');
+      updatePendingNotice();
+
+      const pending = getQueue();
+      const pendingHtml = [...pending].reverse().map(r => entryHtml(r, true)).join('');
+
+      if (!navigator.onLine) {
+        container.innerHTML = pendingHtml ||
+          '<p class="hint">Historique non disponible hors ligne.</p>';
+        return;
+      }
 
       const { data, error } = await db
         .from('suivi_brossage')
@@ -200,31 +348,30 @@
         .limit(30);
 
       if (error) {
-        container.innerHTML = '<p class="hint">Impossible de charger l\'historique.</p>';
+        container.innerHTML = pendingHtml +
+          '<p class="hint">Impossible de charger l\'historique.</p>';
         return;
       }
 
-      if (!data || data.length === 0) {
-        container.innerHTML = '<p class="hint">Aucune entrée pour l\'instant.</p>';
-        return;
-      }
-
-      container.innerHTML = data.map(row => {
-        const d = new Date(row.date_reponse);
-        const dateStr = d.toLocaleDateString('fr-FR', {
-          weekday: 'short', day: 'numeric', month: 'short'
-        }) + ' · ' + d.toLocaleTimeString('fr-FR', {
-          hour: '2-digit', minute: '2-digit'
-        });
-        return `
-          <div class="entry">
-            <span class="entry-date">${dateStr}</span>
-            <span class="badge badge-${row.brossages}">${row.brossages} ×</span>
-          </div>`;
-      }).join('');
+      const syncedHtml = (data || []).map(r => entryHtml(r)).join('');
+      container.innerHTML = pendingHtml + syncedHtml ||
+        '<p class="hint">Aucune entrée pour l\'instant.</p>';
     }
 
+    // ── Service worker ────────────────────────────────────────────────────────
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () =>
+        navigator.serviceWorker.register('./sw.js').catch(console.error)
+      );
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+
+    updateOfflineBanner();
+    updatePendingNotice();
     loadHistory();
+    if (navigator.onLine) syncPending();
   </script>
 </body>
 </html>

@@ -1,0 +1,17 @@
+{
+  "name": "Suivi Brossage des Dents",
+  "short_name": "Brossage",
+  "description": "Tracker quotidien de brossage des dents",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f0f4ff",
+  "theme_color": "#6bcb77",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
